@@ -6,7 +6,7 @@ import {
   generateUniqueUsername,
   validUserPassword,
 } from '../test-data/users-data';
-import type { GenerateTokenResponse } from '../types/authentication';
+import type { SuccessfulGenerateTokenResponse } from '../types/authentication';
 import type { CreatedUserResponse } from '../types/user';
 
 export interface TestUserCredentials {
@@ -86,7 +86,7 @@ export async function createTestUser(
 export async function generateTokenForUser(
   request: APIRequestContext,
   credentials: TestUserCredentials,
-): Promise<GenerateTokenResponse> {
+): Promise<SuccessfulGenerateTokenResponse> {
   const response = await request.post(
     '/Account/v1/GenerateToken',
     {
@@ -101,7 +101,7 @@ export async function generateTokenForUser(
   );
 
   const responseBody =
-    (await response.json()) as GenerateTokenResponse;
+    (await response.json()) as SuccessfulGenerateTokenResponse;
 
   if (!responseBody.token) {
     throw new Error(
