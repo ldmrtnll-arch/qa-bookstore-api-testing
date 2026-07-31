@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 export const validUserPassword = 'QaPortfolio@2026';
 
 export const invalidUserPassword = 'weak';
@@ -24,5 +26,9 @@ export const userNotFoundError = {
 };
 
 export function generateUniqueUsername(): string {
-  return `qa_portfolio_${Date.now()}`;
+  const uniqueSuffix = randomUUID()
+    .replaceAll('-', '')
+    .slice(0, 8);
+
+  return `qa_portfolio_${Date.now()}_${uniqueSuffix}`;
 }
