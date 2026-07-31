@@ -52,7 +52,7 @@ function validateBook(book: Book, index: number): void {
 }
 
 test.describe('GET /BookStore/v1/Books', () => {
-  test('should return the available books successfully', async ({
+  test('API-BKS-001 - should return the available books successfully', async ({
     request,
   }) => {
     const response = await request.get('/BookStore/v1/Books');
