@@ -8,7 +8,10 @@ import {
   getBookCatalog,
   getUserDetails,
 } from '../../utils/bookstore-api';
-import { userNotAuthorizedError } from '../../test-data/book-collection-data';
+import {
+  duplicatedBookError,
+  userNotAuthorizedError,
+} from '../../test-data/book-collection-data';
 import type { ApiErrorResponse } from '../../types/api-error';
 
 test.describe('POST /BookStore/v1/Books', () => {
@@ -240,6 +243,111 @@ test.describe('POST /BookStore/v1/Books', () => {
         userResponseBody.books,
         'The request with an invalid token should not persist a book',
       ).toHaveLength(0);
+    } finally {
+      await cleanupTestUser(
+        request,
+        testUser.userID,
+        testUser.token,
+      );
+    }
+  });
+
+      test('API-COL-004 - should reject adding a duplicated book to the user collection', async ({
+    request,
+  }) => {
+    const testUser =
+      await createAuthenticatedTestUser(request);
+
+    try {
+      const { body: catalog } =
+        await getBookCatalog(request);
+
+      expect(
+        catalog.books.length,
+        'The catalog should contain at least one available book',
+      ).toBeGreaterThan(0);
+
+      const selectedBook = catalog.books[0];
+
+      const firstAddition =
+        await addBookToUserCollection(
+          request,
+          testUser.userID,
+          testUser.token,
+          selectedBook.isbn,
+        );
+
+      expect(
+        firstAddition.response.status(),
+        'The first book addition should succeed',
+      ).toBe(201);
+
+      const duplicatedAdditionResponse =
+        await request.post('/BookStore/v1/Books', {
+          headers: {
+            Authorization: `Bearer ${testUser.token}`,
+          },
+          data: {
+            userId: testUser.userID,
+            collectionOfIsbns: [
+              {
+                isbn: selectedBook.isbn,
+              },
+            ],
+          },
+        });
+
+      expect(
+        duplicatedAdditionResponse.status(),
+      ).toBe(400);
+
+      expect(
+        duplicatedAdditionResponse.headers()[
+          'content-type'
+        ],
+      ).toContain('application/json');
+
+      const responseBody =
+        (await duplicatedAdditionResponse.json()) as ApiErrorResponse;
+
+      expect(responseBody).toEqual(
+        duplicatedBookError,
+      );
+
+      expect(responseBody.code).toBe('1210');
+      expect(responseBody.message).toBe(
+        "ISBN already present in the User's Collection!",
+      );
+
+      const {
+        response: getUserResponse,
+        body: userResponseBody,
+      } = await getUserDetails(
+        request,
+        testUser.userID,
+        testUser.token,
+      );
+
+      expect(getUserResponse.status()).toBe(200);
+
+      expect(
+        userResponseBody.books,
+        'The collection should contain only the first successful addition',
+      ).toHaveLength(1);
+
+      expect(userResponseBody.books[0].isbn).toBe(
+        selectedBook.isbn,
+      );
+
+      const duplicatedIsbnOccurrences =
+        userResponseBody.books.filter(
+          (book) => book.isbn === selectedBook.isbn,
+        ).length;
+
+      expect(
+        duplicatedIsbnOccurrences,
+        'The same ISBN should appear only once in the collection',
+      ).toBe(1);
     } finally {
       await cleanupTestUser(
         request,
