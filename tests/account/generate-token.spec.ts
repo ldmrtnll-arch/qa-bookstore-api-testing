@@ -1,11 +1,22 @@
 import { expect, test } from '@playwright/test';
 import {
+  failedAuthorizationResponse,
+  incorrectUserPassword,
+} from '../../test-data/authentication-data';
+import {
   generateUniqueUsername,
   validUserPassword,
 } from '../../test-data/users-data';
-import type { GenerateTokenResponse } from '../../types/authentication';
+import type {
+  FailedGenerateTokenResponse,
+  SuccessfulGenerateTokenResponse,
+} from '../../types/authentication';
 import type { CreatedUserResponse } from '../../types/user';
-import { cleanupTestUser } from '../../utils/account-api';
+import {
+  cleanupTestUser,
+  createTestUser,
+  generateTokenForUser,
+} from '../../utils/account-api';
 
 test.describe('POST /Account/v1/GenerateToken', () => {
   test('API-AUTH-001 - should generate a token with valid credentials', async ({
@@ -44,12 +55,12 @@ test.describe('POST /Account/v1/GenerateToken', () => {
 
       expect(tokenResponse.status()).toBe(200);
 
-      expect(tokenResponse.headers()['content-type']).toContain(
-        'application/json',
-      );
+      expect(
+        tokenResponse.headers()['content-type'],
+      ).toContain('application/json');
 
       const responseBody =
-        (await tokenResponse.json()) as GenerateTokenResponse;
+        (await tokenResponse.json()) as SuccessfulGenerateTokenResponse;
 
       generatedToken = responseBody.token;
 
@@ -79,6 +90,52 @@ test.describe('POST /Account/v1/GenerateToken', () => {
           generatedToken,
         );
       }
+    }
+  });
+
+  test('API-AUTH-002 - should fail token generation when the password is incorrect', async ({
+    request,
+  }) => {
+    const testUser = await createTestUser(request);
+
+    try {
+      const response = await request.post(
+        '/Account/v1/GenerateToken',
+        {
+          data: {
+            userName: testUser.credentials.userName,
+            password: incorrectUserPassword,
+          },
+        },
+      );
+
+      expect(response.status()).toBe(200);
+
+      expect(response.headers()['content-type']).toContain(
+        'application/json',
+      );
+
+      const responseBody =
+        (await response.json()) as FailedGenerateTokenResponse;
+
+      expect(responseBody).toEqual(
+        failedAuthorizationResponse,
+      );
+
+      expect(responseBody.token).toBeNull();
+      expect(responseBody.expires).toBeNull();
+      expect(responseBody.status).toBe('Failed');
+    } finally {
+      const generatedToken = await generateTokenForUser(
+        request,
+        testUser.credentials,
+      );
+
+      await cleanupTestUser(
+        request,
+        testUser.userID,
+        generatedToken.token,
+      );
     }
   });
 });
