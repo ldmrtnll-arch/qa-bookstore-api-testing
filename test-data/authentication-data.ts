@@ -7,3 +7,8 @@ export const failedAuthorizationResponse = {
   status: 'Failed',
   result: 'User authorization failed.',
 };
+
+export const authorizationUserNotFoundError = {
+  code: '1207',
+  message: 'User not found!',
+};
