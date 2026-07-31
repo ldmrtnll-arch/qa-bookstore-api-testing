@@ -1,14 +1,13 @@
 import { expect, test } from '@playwright/test';
-import type { BooksResponse } from '../../types/book';
-import type {
-  AddBooksRequest,
-  AddBooksResponse,
-} from '../../types/book-collection';
-import type { UserDetailsResponse } from '../../types/user-details';
 import {
   cleanupTestUser,
   createAuthenticatedTestUser,
 } from '../../utils/account-api';
+import {
+  addBookToUserCollection,
+  getBookCatalog,
+  getUserDetails,
+} from '../../utils/bookstore-api';
 
 test.describe('POST /BookStore/v1/Books', () => {
   test('API-COL-001 - should add an available book to an authenticated user collection', async ({
@@ -18,18 +17,16 @@ test.describe('POST /BookStore/v1/Books', () => {
       await createAuthenticatedTestUser(request);
 
     try {
-      const catalogResponse = await request.get(
-        '/BookStore/v1/Books',
-      );
+      const {
+        response: catalogResponse,
+        body: catalog,
+      } = await getBookCatalog(request);
 
       expect(catalogResponse.status()).toBe(200);
 
       expect(
         catalogResponse.headers()['content-type'],
       ).toContain('application/json');
-
-      const catalog =
-        (await catalogResponse.json()) as BooksResponse;
 
       expect(
         catalog.books.length,
@@ -38,23 +35,14 @@ test.describe('POST /BookStore/v1/Books', () => {
 
       const selectedBook = catalog.books[0];
 
-      const requestBody: AddBooksRequest = {
-        userId: testUser.userID,
-        collectionOfIsbns: [
-          {
-            isbn: selectedBook.isbn,
-          },
-        ],
-      };
-
-      const addBookResponse = await request.post(
-        '/BookStore/v1/Books',
-        {
-          headers: {
-            Authorization: `Bearer ${testUser.token}`,
-          },
-          data: requestBody,
-        },
+      const {
+        response: addBookResponse,
+        body: addBookResponseBody,
+      } = await addBookToUserCollection(
+        request,
+        testUser.userID,
+        testUser.token,
+        selectedBook.isbn,
       );
 
       expect(addBookResponse.status()).toBe(201);
@@ -63,22 +51,19 @@ test.describe('POST /BookStore/v1/Books', () => {
         addBookResponse.headers()['content-type'],
       ).toContain('application/json');
 
-      const addBookResponseBody =
-        (await addBookResponse.json()) as AddBooksResponse;
-
       expect(addBookResponseBody.books).toEqual([
         {
           isbn: selectedBook.isbn,
         },
       ]);
 
-      const getUserResponse = await request.get(
-        `/Account/v1/User/${testUser.userID}`,
-        {
-          headers: {
-            Authorization: `Bearer ${testUser.token}`,
-          },
-        },
+      const {
+        response: getUserResponse,
+        body: userResponseBody,
+      } = await getUserDetails(
+        request,
+        testUser.userID,
+        testUser.token,
       );
 
       expect(getUserResponse.status()).toBe(200);
@@ -86,9 +71,6 @@ test.describe('POST /BookStore/v1/Books', () => {
       expect(
         getUserResponse.headers()['content-type'],
       ).toContain('application/json');
-
-      const userResponseBody =
-        (await getUserResponse.json()) as UserDetailsResponse;
 
       expect(userResponseBody.userId).toBe(
         testUser.userID,
