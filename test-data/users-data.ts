@@ -18,6 +18,11 @@ export const usernameAndPasswordRequiredError = {
   message: 'UserName and Password required.',
 };
 
+export const userNotFoundError = {
+  code: '1207',
+  message: 'User not found!',
+};
+
 export function generateUniqueUsername(): string {
   return `qa_portfolio_${Date.now()}`;
 }
