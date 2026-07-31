@@ -7,3 +7,12 @@ export const duplicatedBookError = {
   code: '1210',
   message: "ISBN already present in the User's Collection!",
 };
+
+export const nonexistentBookIsbn =
+  '9999999999999';
+
+export const bookNotAvailableError = {
+  code: '1205',
+  message:
+    'ISBN supplied is not available in Books Collection!',
+};
