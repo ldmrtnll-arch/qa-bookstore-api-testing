@@ -5,10 +5,12 @@ export const validBook = {
   publisher: "O'Reilly Media",
 };
 
+export const isbnNotAvailableError = {
+  code: '1205',
+  message: 'ISBN supplied is not available in Books Collection!',
+};
+
 export const unavailableBook = {
   isbn: '9780000000000',
-  expectedError: {
-    code: '1205',
-    message: 'ISBN supplied is not available in Books Collection!',
-  },
+  expectedError: isbnNotAvailableError,
 };
