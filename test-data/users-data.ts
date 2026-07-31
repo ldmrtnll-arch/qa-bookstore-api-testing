@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 export const validUserPassword = '***REMOVED***';
 
 export const invalidUserPassword = 'weak';
@@ -18,6 +20,15 @@ export const usernameAndPasswordRequiredError = {
   message: 'UserName and Password required.',
 };
 
+export const userNotFoundError = {
+  code: '1207',
+  message: 'User not found!',
+};
+
 export function generateUniqueUsername(): string {
-  return `qa_portfolio_${Date.now()}`;
+  const uniqueSuffix = randomUUID()
+    .replaceAll('-', '')
+    .slice(0, 8);
+
+  return `qa_portfolio_${Date.now()}_${uniqueSuffix}`;
 }
