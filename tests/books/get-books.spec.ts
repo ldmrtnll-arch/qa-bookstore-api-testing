@@ -1,20 +1,15 @@
-import { expect, test } from '@playwright/test';
-import type { Book, BooksResponse } from '../../types/book';
+import { expect, test } from "@playwright/test";
+import { booksResponseSchema } from "../../schemas/books-response.schema";
+import type { Book, BooksResponse } from "../../types/book";
+import { assertMatchesSchema } from "../../utils/schema-validator";
 
-function expectNonEmptyString(
-  value: unknown,
-  fieldName: string,
-): void {
-  expect.soft(
-    typeof value,
-    `${fieldName} should be a string`,
-  ).toBe('string');
+function expectNonEmptyString(value: unknown, fieldName: string): void {
+  expect.soft(typeof value, `${fieldName} should be a string`).toBe("string");
 
-  if (typeof value === 'string') {
-    expect.soft(
-      value.trim().length,
-      `${fieldName} should not be empty`,
-    ).toBeGreaterThan(0);
+  if (typeof value === "string") {
+    expect
+      .soft(value.trim().length, `${fieldName} should not be empty`)
+      .toBeGreaterThan(0);
   }
 }
 
@@ -30,42 +25,48 @@ function validateBook(book: Book, index: number): void {
   expectNonEmptyString(book.description, `${bookPath}.description`);
   expectNonEmptyString(book.website, `${bookPath}.website`);
 
-  expect.soft(
-    Number.isInteger(book.pages),
-    `${bookPath}.pages should be an integer`,
-  ).toBe(true);
+  expect
+    .soft(
+      Number.isInteger(book.pages),
+      `${bookPath}.pages should be an integer`,
+    )
+    .toBe(true);
 
-  expect.soft(
-    book.pages,
-    `${bookPath}.pages should be greater than zero`,
-  ).toBeGreaterThan(0);
+  expect
+    .soft(book.pages, `${bookPath}.pages should be greater than zero`)
+    .toBeGreaterThan(0);
 
-  expect.soft(
-    Number.isNaN(Date.parse(book.publish_date)),
-    `${bookPath}.publish_date should be a valid date`,
-  ).toBe(false);
+  expect
+    .soft(
+      Number.isNaN(Date.parse(book.publish_date)),
+      `${bookPath}.publish_date should be a valid date`,
+    )
+    .toBe(false);
 
-  expect.soft(
-    book.website,
-    `${bookPath}.website should be an HTTP or HTTPS URL`,
-  ).toMatch(/^https?:\/\/.+/);
+  expect
+    .soft(book.website, `${bookPath}.website should be an HTTP or HTTPS URL`)
+    .toMatch(/^https?:\/\/.+/);
 }
 
-test.describe('GET /BookStore/v1/Books', () => {
-  test('API-BKS-001 - should return the available books successfully', async ({
+test.describe("GET /BookStore/v1/Books", () => {
+  test("API-BKS-001 - should return the available books successfully", async ({
     request,
   }) => {
-    const response = await request.get('/BookStore/v1/Books');
+    const response = await request.get("/BookStore/v1/Books");
 
     expect(response.status()).toBe(200);
 
-    expect(response.headers()['content-type']).toContain(
-      'application/json',
+    expect(response.headers()["content-type"]).toContain("application/json");
+
+    const responseBody: unknown = await response.json();
+
+    assertMatchesSchema<BooksResponse>(
+      booksResponseSchema,
+      responseBody,
+      "GET /BookStore/v1/Books response",
     );
 
-    const responseBody = (await response.json()) as BooksResponse;
-
-    expect(responseBody).toHaveProperty('books');
+    expect(responseBody).toHaveProperty("books");
     expect(Array.isArray(responseBody.books)).toBe(true);
     expect(responseBody.books.length).toBeGreaterThan(0);
 
@@ -73,15 +74,13 @@ test.describe('GET /BookStore/v1/Books', () => {
       validateBook(book, index);
     }
 
-    const returnedIsbns = responseBody.books.map(
-      (book) => book.isbn,
-    );
+    const returnedIsbns = responseBody.books.map((book) => book.isbn);
 
     const uniqueIsbns = new Set(returnedIsbns);
 
     expect(
       uniqueIsbns.size,
-      'The catalog should not contain duplicated ISBNs',
+      "The catalog should not contain duplicated ISBNs",
     ).toBe(returnedIsbns.length);
   });
 });
