@@ -16,3 +16,9 @@ export const bookNotAvailableError = {
   message:
     'ISBN supplied is not available in Books Collection!',
 };
+
+export const bookNotInUserCollectionError = {
+  code: '1206',
+  message:
+    "ISBN supplied is not available in User's Collection!",
+};
