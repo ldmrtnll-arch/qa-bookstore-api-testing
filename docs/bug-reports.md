@@ -163,8 +163,167 @@ When the parameter is missing, the API should immediately return a controlled
 
 ---
 
+## BUG-API-002 — Generated JWT exposes the user's password in its payload
+
+| Field | Details |
+|---|---|
+| Bug ID | BUG-API-002 |
+| Related test case | API-AUTH-001 |
+| Endpoint | `POST /Account/v1/GenerateToken` |
+| Severity | High |
+| Priority | High |
+| Status | Open |
+| Environment | DemoQA Book Store API |
+| Observed on | 2026-07-31 |
+
+### Description
+
+The JWT generated after successful authentication includes the user's password
+inside its payload.
+
+JWT payloads are encoded and can be decoded by anyone who obtains the token.
+They are not encrypted by default.
+
+Consequently, exposing the password in the payload may reveal the user's
+credentials if the token is accessed through application logs, browser storage,
+monitoring tools, network captures, or another unintended location.
+
+### Preconditions
+
+- A valid user exists in the Book Store API.
+- The client has the username and password of that user.
+- The API is available.
+
+### Steps to reproduce
+
+1. Create a valid user through:
+
+   ```http
+   POST /Account/v1/User
+   ```
+
+2. Generate a token using the same credentials:
+
+   ```http
+   POST /Account/v1/GenerateToken
+   ```
+
+3. Copy the generated JWT.
+4. Decode the second JWT segment, which represents the payload.
+5. Inspect the decoded fields.
+
+### Expected result
+
+The JWT payload should contain only the minimum claims necessary for
+authentication and authorization.
+
+Sensitive credentials such as the user's password must not be included.
+
+Example of an acceptable payload:
+
+```json
+{
+  "sub": "<user-id>",
+  "userName": "<username>",
+  "iat": 1785512952,
+  "exp": 1786117752
+}
+```
+
+### Actual result
+
+The decoded JWT payload contains the user's password.
+
+The sensitive values below are intentionally redacted:
+
+```json
+{
+  "userName": "[REDACTED]",
+  "password": "[REDACTED]",
+  "iat": 1785512952
+}
+```
+
+### Request example
+
+```http
+POST /Account/v1/GenerateToken
+Content-Type: application/json
+```
+
+```json
+{
+  "userName": "<valid-username>",
+  "password": "<valid-password>"
+}
+```
+
+### Impact
+
+If the JWT is exposed, an unauthorized person may decode the payload and obtain
+the user's password.
+
+This creates additional risk because the same credentials may be used to:
+
+- authenticate as the affected user;
+- access other protected API resources;
+- compromise accounts where the password was reused;
+- maintain access even after the original token expires;
+- expose credentials through logs or monitoring systems.
+
+### Frequency
+
+The issue was observed during the successful execution of `API-AUTH-001` on
+2026-07-31.
+
+### Workaround
+
+There is no complete client-side workaround because the sensitive information
+is added by the API when the token is generated.
+
+Clients should avoid logging, displaying, or storing the complete token in
+unprotected locations.
+
+### Evidence handling
+
+The complete JWT and password are intentionally not included in this public
+repository.
+
+The payload was inspected locally, and all sensitive values were redacted
+before documentation.
+
+### Automation status
+
+The related automated scenario remains active:
+
+```text
+API-AUTH-001 - should generate a token with valid credentials
+```
+
+The automated test validates the token structure and successful generation but
+does not print the token in execution logs.
+
+### Suggested fix
+
+Remove the password claim from the JWT payload.
+
+The token should contain only non-sensitive claims required to identify the
+user and enforce authorization, such as:
+
+- user identifier;
+- username, when necessary;
+- issued-at timestamp;
+- expiration timestamp;
+- roles or permissions, when applicable.
+
+After the change, invalidate previously issued tokens and review logs or systems
+where the affected tokens may have been stored.
+
+---
+
 ## Bug summary
 
 | Bug ID | Description | Severity | Priority | Status | Related test |
 |---|---|---:|---:|---|---|
 | BUG-API-001 | Endpoint does not respond when the ISBN parameter is omitted | Medium | Medium | Open | API-BKS-005 |
+| BUG-API-002 | Generated JWT exposes the user's password in its payload | High | High | Open | API-AUTH-001 |
