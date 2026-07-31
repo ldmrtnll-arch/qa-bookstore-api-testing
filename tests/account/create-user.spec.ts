@@ -9,6 +9,10 @@ import {
 } from '../../test-data/users-data';
 import type { ApiErrorResponse } from '../../types/api-error';
 import type { CreatedUserResponse } from '../../types/user';
+import {
+  cleanupTestUser,
+  generateTokenForUser,
+} from '../../utils/account-api';
 
 test.describe('POST /Account/v1/User', () => {
   test('API-ACC-001 - should create a user with valid credentials', async ({
@@ -16,29 +20,51 @@ test.describe('POST /Account/v1/User', () => {
   }) => {
     const username = generateUniqueUsername();
 
-    const response = await request.post('/Account/v1/User', {
-      data: {
-        userName: username,
-        password: validUserPassword,
-      },
-    });
+    const userData = {
+      userName: username,
+      password: validUserPassword,
+    };
 
-    expect(response.status()).toBe(201);
+    let createdUser: CreatedUserResponse | undefined;
 
-    expect(response.headers()['content-type']).toContain(
-      'application/json',
-    );
+    try {
+      const response = await request.post(
+        '/Account/v1/User',
+        {
+          data: userData,
+        },
+      );
 
-    const responseBody =
-      (await response.json()) as CreatedUserResponse;
+      expect(response.status()).toBe(201);
 
-    expect(responseBody.userID).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
-    );
+      expect(response.headers()['content-type']).toContain(
+        'application/json',
+      );
 
-    expect(responseBody.username).toBe(username);
-    expect(Array.isArray(responseBody.books)).toBe(true);
-    expect(responseBody.books).toHaveLength(0);
+      createdUser =
+        (await response.json()) as CreatedUserResponse;
+
+      expect(createdUser.userID).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+      );
+
+      expect(createdUser.username).toBe(username);
+      expect(Array.isArray(createdUser.books)).toBe(true);
+      expect(createdUser.books).toHaveLength(0);
+    } finally {
+      if (createdUser?.userID) {
+        const generatedToken = await generateTokenForUser(
+          request,
+          userData,
+        );
+
+        await cleanupTestUser(
+          request,
+          createdUser.userID,
+          generatedToken.token,
+        );
+      }
+    }
   });
 
   test('API-ACC-002 - should return an error when creating a duplicated user', async ({
@@ -51,29 +77,54 @@ test.describe('POST /Account/v1/User', () => {
       password: validUserPassword,
     };
 
-    const firstResponse = await request.post('/Account/v1/User', {
-      data: userData,
-    });
+    let createdUser: CreatedUserResponse | undefined;
 
-    expect(firstResponse.status()).toBe(201);
+    try {
+      const firstResponse = await request.post(
+        '/Account/v1/User',
+        {
+          data: userData,
+        },
+      );
 
-    const duplicatedResponse = await request.post(
-      '/Account/v1/User',
-      {
-        data: userData,
-      },
-    );
+      expect(firstResponse.status()).toBe(201);
 
-    expect(duplicatedResponse.status()).toBe(406);
+      createdUser =
+        (await firstResponse.json()) as CreatedUserResponse;
 
-    expect(
-      duplicatedResponse.headers()['content-type'],
-    ).toContain('application/json');
+      expect(createdUser.userID).toBeTruthy();
 
-    const responseBody =
-      (await duplicatedResponse.json()) as ApiErrorResponse;
+      const duplicatedResponse = await request.post(
+        '/Account/v1/User',
+        {
+          data: userData,
+        },
+      );
 
-    expect(responseBody).toEqual(userAlreadyExistsError);
+      expect(duplicatedResponse.status()).toBe(406);
+
+      expect(
+        duplicatedResponse.headers()['content-type'],
+      ).toContain('application/json');
+
+      const responseBody =
+        (await duplicatedResponse.json()) as ApiErrorResponse;
+
+      expect(responseBody).toEqual(userAlreadyExistsError);
+    } finally {
+      if (createdUser?.userID) {
+        const generatedToken = await generateTokenForUser(
+          request,
+          userData,
+        );
+
+        await cleanupTestUser(
+          request,
+          createdUser.userID,
+          generatedToken.token,
+        );
+      }
+    }
   });
 
   test('API-ACC-003 - should return an error when the password does not meet the requirements', async ({
@@ -124,7 +175,7 @@ test.describe('POST /Account/v1/User', () => {
     );
   });
 
-      test('API-ACC-005 - should return an error when the password is empty', async ({
+  test('API-ACC-005 - should return an error when the password is empty', async ({
     request,
   }) => {
     const username = generateUniqueUsername();
