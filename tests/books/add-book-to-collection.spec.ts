@@ -172,4 +172,80 @@ test.describe('POST /BookStore/v1/Books', () => {
       );
     }
   });
+
+      test('API-COL-003 - should reject adding a book with an invalid token', async ({
+    request,
+  }) => {
+    const testUser =
+      await createAuthenticatedTestUser(request);
+
+    try {
+      const { body: catalog } =
+        await getBookCatalog(request);
+
+      expect(
+        catalog.books.length,
+        'The catalog should contain at least one available book',
+      ).toBeGreaterThan(0);
+
+      const selectedBook = catalog.books[0];
+
+      const response = await request.post(
+        '/BookStore/v1/Books',
+        {
+          headers: {
+            Authorization: 'Bearer invalid-token',
+          },
+          data: {
+            userId: testUser.userID,
+            collectionOfIsbns: [
+              {
+                isbn: selectedBook.isbn,
+              },
+            ],
+          },
+        },
+      );
+
+      expect(response.status()).toBe(401);
+
+      expect(
+        response.headers()['content-type'],
+      ).toContain('application/json');
+
+      const responseBody =
+        (await response.json()) as ApiErrorResponse;
+
+      expect(responseBody).toEqual(
+        userNotAuthorizedError,
+      );
+
+      expect(responseBody.code).toBe('1200');
+      expect(responseBody.message).toBe(
+        'User not authorized!',
+      );
+
+      const {
+        response: getUserResponse,
+        body: userResponseBody,
+      } = await getUserDetails(
+        request,
+        testUser.userID,
+        testUser.token,
+      );
+
+      expect(getUserResponse.status()).toBe(200);
+
+      expect(
+        userResponseBody.books,
+        'The request with an invalid token should not persist a book',
+      ).toHaveLength(0);
+    } finally {
+      await cleanupTestUser(
+        request,
+        testUser.userID,
+        testUser.token,
+      );
+    }
+  });
 });
