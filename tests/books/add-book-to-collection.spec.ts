@@ -9,7 +9,9 @@ import {
   getUserDetails,
 } from '../../utils/bookstore-api';
 import {
+  bookNotAvailableError,
   duplicatedBookError,
+  nonexistentBookIsbn,
   userNotAuthorizedError,
 } from '../../test-data/book-collection-data';
 import type { ApiErrorResponse } from '../../types/api-error';
@@ -348,6 +350,73 @@ test.describe('POST /BookStore/v1/Books', () => {
         duplicatedIsbnOccurrences,
         'The same ISBN should appear only once in the collection',
       ).toBe(1);
+    } finally {
+      await cleanupTestUser(
+        request,
+        testUser.userID,
+        testUser.token,
+      );
+    }
+  });
+
+      test('API-COL-005 - should reject adding an ISBN that is not available in the catalog', async ({
+    request,
+  }) => {
+    const testUser =
+      await createAuthenticatedTestUser(request);
+
+    try {
+      const response = await request.post(
+        '/BookStore/v1/Books',
+        {
+          headers: {
+            Authorization: `Bearer ${testUser.token}`,
+          },
+          data: {
+            userId: testUser.userID,
+            collectionOfIsbns: [
+              {
+                isbn: nonexistentBookIsbn,
+              },
+            ],
+          },
+        },
+      );
+
+      expect(response.status()).toBe(400);
+
+      expect(
+        response.headers()['content-type'],
+      ).toContain('application/json');
+
+      const responseBody =
+        (await response.json()) as ApiErrorResponse;
+
+      expect(responseBody).toEqual(
+        bookNotAvailableError,
+      );
+
+      expect(responseBody.code).toBe('1205');
+
+      expect(responseBody.message).toBe(
+        'ISBN supplied is not available in Books Collection!',
+      );
+
+      const {
+        response: getUserResponse,
+        body: userResponseBody,
+      } = await getUserDetails(
+        request,
+        testUser.userID,
+        testUser.token,
+      );
+
+      expect(getUserResponse.status()).toBe(200);
+
+      expect(
+        userResponseBody.books,
+        'An unavailable ISBN should not be persisted in the user collection',
+      ).toHaveLength(0);
     } finally {
       await cleanupTestUser(
         request,
