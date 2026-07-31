@@ -425,4 +425,122 @@ test.describe('POST /BookStore/v1/Books', () => {
       );
     }
   });
+
+      test('API-COL-010 - should prevent one user from adding a book to another user collection', async ({
+    request,
+  }) => {
+    const actingUser =
+      await createAuthenticatedTestUser(request);
+
+    try {
+      const targetUser =
+        await createAuthenticatedTestUser(request);
+
+      try {
+        const { body: catalog } =
+          await getBookCatalog(request);
+
+        expect(
+          catalog.books.length,
+          'The catalog should contain at least one available book',
+        ).toBeGreaterThan(0);
+
+        const selectedBook = catalog.books[0];
+
+        const response = await request.post(
+          '/BookStore/v1/Books',
+          {
+            headers: {
+              Authorization: `Bearer ${actingUser.token}`,
+            },
+            data: {
+              userId: targetUser.userID,
+              collectionOfIsbns: [
+                {
+                  isbn: selectedBook.isbn,
+                },
+              ],
+            },
+          },
+        );
+
+        expect(response.status()).toBe(401);
+
+        expect(
+          response.headers()['content-type'],
+        ).toContain('application/json');
+
+        const responseBody =
+          (await response.json()) as ApiErrorResponse;
+
+        expect(responseBody).toEqual(
+          userNotAuthorizedError,
+        );
+
+        expect(responseBody.code).toBe('1200');
+
+        expect(responseBody.message).toBe(
+          'User not authorized!',
+        );
+
+        const {
+          response: actingUserResponse,
+          body: actingUserDetails,
+        } = await getUserDetails(
+          request,
+          actingUser.userID,
+          actingUser.token,
+        );
+
+        expect(actingUserResponse.status()).toBe(200);
+
+        expect(actingUserDetails.userId).toBe(
+          actingUser.userID,
+        );
+
+        expect(
+          actingUserDetails.books,
+          'The acting user collection should remain unchanged',
+        ).toHaveLength(0);
+
+        const {
+          response: targetUserResponse,
+          body: targetUserDetails,
+        } = await getUserDetails(
+          request,
+          targetUser.userID,
+          targetUser.token,
+        );
+
+        expect(targetUserResponse.status()).toBe(200);
+
+        expect(targetUserDetails.userId).toBe(
+          targetUser.userID,
+        );
+
+        expect(
+          targetUserDetails.books,
+          'The target user collection should remain unchanged',
+        ).toHaveLength(0);
+
+        expect(
+          targetUserDetails.books.some(
+            (book) => book.isbn === selectedBook.isbn,
+          ),
+        ).toBe(false);
+      } finally {
+        await cleanupTestUser(
+          request,
+          targetUser.userID,
+          targetUser.token,
+        );
+      }
+    } finally {
+      await cleanupTestUser(
+        request,
+        actingUser.userID,
+        actingUser.token,
+      );
+    }
+  });
 });
