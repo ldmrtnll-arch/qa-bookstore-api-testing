@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test';
+import { bookNotInUserCollectionError } from '../../test-data/book-collection-data';
+import type { ApiErrorResponse } from '../../types/api-error';
 import {
   cleanupTestUser,
   createAuthenticatedTestUser,
@@ -104,6 +106,101 @@ test.describe('DELETE /BookStore/v1/Book', () => {
           (book) => book.isbn === selectedBook.isbn,
         ),
       ).toBe(false);
+    } finally {
+      await cleanupTestUser(
+        request,
+        testUser.userID,
+        testUser.token,
+      );
+    }
+  });
+
+      test('API-COL-007 - should reject removing a book that is not in the user collection', async ({
+    request,
+  }) => {
+    const testUser =
+      await createAuthenticatedTestUser(request);
+
+    try {
+      const { body: catalog } =
+        await getBookCatalog(request);
+
+      expect(
+        catalog.books.length,
+        'The catalog should contain at least one available book',
+      ).toBeGreaterThan(0);
+
+      const selectedBook = catalog.books[0];
+
+      const {
+        response: userBeforeRemovalResponse,
+        body: userBeforeRemoval,
+      } = await getUserDetails(
+        request,
+        testUser.userID,
+        testUser.token,
+      );
+
+      expect(
+        userBeforeRemovalResponse.status(),
+      ).toBe(200);
+
+      expect(
+        userBeforeRemoval.books,
+        'The user collection should initially be empty',
+      ).toHaveLength(0);
+
+      const removeBookResponse =
+        await request.delete('/BookStore/v1/Book', {
+          headers: {
+            Authorization: `Bearer ${testUser.token}`,
+          },
+          data: {
+            isbn: selectedBook.isbn,
+            userId: testUser.userID,
+          },
+        });
+
+      expect(removeBookResponse.status()).toBe(400);
+
+      expect(
+        removeBookResponse.headers()['content-type'],
+      ).toContain('application/json');
+
+      const responseBody =
+        (await removeBookResponse.json()) as ApiErrorResponse;
+
+      expect(responseBody).toEqual(
+        bookNotInUserCollectionError,
+      );
+
+      expect(responseBody.code).toBe('1206');
+
+      expect(responseBody.message).toBe(
+        "ISBN supplied is not available in User's Collection!",
+      );
+
+      const {
+        response: userAfterRemovalResponse,
+        body: userAfterRemoval,
+      } = await getUserDetails(
+        request,
+        testUser.userID,
+        testUser.token,
+      );
+
+      expect(
+        userAfterRemovalResponse.status(),
+      ).toBe(200);
+
+      expect(userAfterRemoval.userId).toBe(
+        testUser.userID,
+      );
+
+      expect(
+        userAfterRemoval.books,
+        'The failed removal should not change the user collection',
+      ).toHaveLength(0);
     } finally {
       await cleanupTestUser(
         request,
