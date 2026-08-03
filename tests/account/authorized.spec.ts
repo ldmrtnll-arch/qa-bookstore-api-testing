@@ -1,20 +1,23 @@
 import { expect, test } from '@playwright/test';
+import { apiErrorSchema } from '../../schemas/api-error.schema';
+import { authorizedResponseSchema } from '../../schemas/authorized-response.schema';
 import {
   authorizationUserNotFoundError,
   incorrectUserPassword,
 } from '../../test-data/authentication-data';
+import {
+  generateUniqueUsername,
+  usernameAndPasswordRequiredError,
+  validUserPassword,
+} from '../../test-data/users-data';
+import type { ApiErrorResponse } from '../../types/api-error';
 import {
   cleanupTestUser,
   createAuthenticatedTestUser,
   createTestUser,
   generateTokenForUser,
 } from '../../utils/account-api';
-import type { ApiErrorResponse } from '../../types/api-error';
-import {
-  generateUniqueUsername,
-  usernameAndPasswordRequiredError,
-  validUserPassword,
-} from '../../test-data/users-data';
+import { assertMatchesSchema } from '../../utils/schema-validator';
 
 test.describe('POST /Account/v1/Authorized', () => {
   test('API-AUTH-006 - should authorize the user only after token generation', async ({
@@ -32,12 +35,19 @@ test.describe('POST /Account/v1/Authorized', () => {
       );
 
       expect(responseBeforeToken.status()).toBe(200);
+
       expect(
         responseBeforeToken.headers()['content-type'],
       ).toContain('application/json');
 
-      const authorizationBeforeToken =
-        (await responseBeforeToken.json()) as boolean;
+      const authorizationBeforeToken: unknown =
+        await responseBeforeToken.json();
+
+      assertMatchesSchema<boolean>(
+        authorizedResponseSchema,
+        authorizationBeforeToken,
+        'POST /Account/v1/Authorized response before token generation',
+      );
 
       expect(authorizationBeforeToken).toBe(false);
 
@@ -56,12 +66,19 @@ test.describe('POST /Account/v1/Authorized', () => {
       );
 
       expect(responseAfterToken.status()).toBe(200);
+
       expect(
         responseAfterToken.headers()['content-type'],
       ).toContain('application/json');
 
-      const authorizationAfterToken =
-        (await responseAfterToken.json()) as boolean;
+      const authorizationAfterToken: unknown =
+        await responseAfterToken.json();
+
+      assertMatchesSchema<boolean>(
+        authorizedResponseSchema,
+        authorizationAfterToken,
+        'POST /Account/v1/Authorized response after token generation',
+      );
 
       expect(authorizationAfterToken).toBe(true);
     } finally {
@@ -82,7 +99,7 @@ test.describe('POST /Account/v1/Authorized', () => {
     }
   });
 
-      test('API-AUTH-007 - should return an error when authorizing with an incorrect password', async ({
+  test('API-AUTH-007 - should return an error when authorizing with an incorrect password', async ({
     request,
   }) => {
     const testUser =
@@ -105,14 +122,21 @@ test.describe('POST /Account/v1/Authorized', () => {
         response.headers()['content-type'],
       ).toContain('application/json');
 
-      const responseBody =
-        (await response.json()) as ApiErrorResponse;
+      const responseBody: unknown =
+        await response.json();
+
+      assertMatchesSchema<ApiErrorResponse>(
+        apiErrorSchema,
+        responseBody,
+        'POST /Account/v1/Authorized incorrect password error',
+      );
 
       expect(responseBody).toEqual(
         authorizationUserNotFoundError,
       );
 
       expect(responseBody.code).toBe('1207');
+
       expect(responseBody.message).toBe(
         'User not found!',
       );
@@ -125,7 +149,7 @@ test.describe('POST /Account/v1/Authorized', () => {
     }
   });
 
-      test('API-AUTH-008 - should return an error when authorizing a nonexistent user', async ({
+  test('API-AUTH-008 - should return an error when authorizing a nonexistent user', async ({
     request,
   }) => {
     const response = await request.post(
@@ -144,20 +168,27 @@ test.describe('POST /Account/v1/Authorized', () => {
       response.headers()['content-type'],
     ).toContain('application/json');
 
-    const responseBody =
-      (await response.json()) as ApiErrorResponse;
+    const responseBody: unknown =
+      await response.json();
+
+    assertMatchesSchema<ApiErrorResponse>(
+      apiErrorSchema,
+      responseBody,
+      'POST /Account/v1/Authorized nonexistent user error',
+    );
 
     expect(responseBody).toEqual(
       authorizationUserNotFoundError,
     );
 
     expect(responseBody.code).toBe('1207');
+
     expect(responseBody.message).toBe(
       'User not found!',
     );
   });
-  
-      test('API-AUTH-009 - should return an error when authorizing with an empty username', async ({
+
+  test('API-AUTH-009 - should return an error when authorizing with an empty username', async ({
     request,
   }) => {
     const response = await request.post(
@@ -176,20 +207,27 @@ test.describe('POST /Account/v1/Authorized', () => {
       response.headers()['content-type'],
     ).toContain('application/json');
 
-    const responseBody =
-      (await response.json()) as ApiErrorResponse;
+    const responseBody: unknown =
+      await response.json();
+
+    assertMatchesSchema<ApiErrorResponse>(
+      apiErrorSchema,
+      responseBody,
+      'POST /Account/v1/Authorized empty username error',
+    );
 
     expect(responseBody).toEqual(
       usernameAndPasswordRequiredError,
     );
 
     expect(responseBody.code).toBe('1200');
+
     expect(responseBody.message).toBe(
       'UserName and Password required.',
     );
   });
 
-      test('API-AUTH-010 - should return an error when authorizing with an empty password', async ({
+  test('API-AUTH-010 - should return an error when authorizing with an empty password', async ({
     request,
   }) => {
     const response = await request.post(
@@ -208,14 +246,21 @@ test.describe('POST /Account/v1/Authorized', () => {
       response.headers()['content-type'],
     ).toContain('application/json');
 
-    const responseBody =
-      (await response.json()) as ApiErrorResponse;
+    const responseBody: unknown =
+      await response.json();
+
+    assertMatchesSchema<ApiErrorResponse>(
+      apiErrorSchema,
+      responseBody,
+      'POST /Account/v1/Authorized empty password error',
+    );
 
     expect(responseBody).toEqual(
       usernameAndPasswordRequiredError,
     );
 
     expect(responseBody.code).toBe('1200');
+
     expect(responseBody.message).toBe(
       'UserName and Password required.',
     );
