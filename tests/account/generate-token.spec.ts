@@ -1,4 +1,9 @@
 import { expect, test } from '@playwright/test';
+import { apiErrorSchema } from '../../schemas/api-error.schema';
+import {
+  failedGenerateTokenResponseSchema,
+  successfulGenerateTokenResponseSchema,
+} from '../../schemas/generate-token-response.schema';
 import {
   failedAuthorizationResponse,
   incorrectUserPassword,
@@ -8,6 +13,7 @@ import {
   usernameAndPasswordRequiredError,
   validUserPassword,
 } from '../../test-data/users-data';
+import type { ApiErrorResponse } from '../../types/api-error';
 import type {
   FailedGenerateTokenResponse,
   SuccessfulGenerateTokenResponse,
@@ -18,7 +24,7 @@ import {
   createTestUser,
   generateTokenForUser,
 } from '../../utils/account-api';
-import type { ApiErrorResponse } from '../../types/api-error';
+import { assertMatchesSchema } from '../../utils/schema-validator';
 
 test.describe('POST /Account/v1/GenerateToken', () => {
   test('API-AUTH-001 - should generate a token with valid credentials', async ({
@@ -61,8 +67,14 @@ test.describe('POST /Account/v1/GenerateToken', () => {
         tokenResponse.headers()['content-type'],
       ).toContain('application/json');
 
-      const responseBody =
-        (await tokenResponse.json()) as SuccessfulGenerateTokenResponse;
+      const responseBody: unknown =
+        await tokenResponse.json();
+
+      assertMatchesSchema<SuccessfulGenerateTokenResponse>(
+        successfulGenerateTokenResponseSchema,
+        responseBody,
+        'POST /Account/v1/GenerateToken success response',
+      );
 
       generatedToken = responseBody.token;
 
@@ -117,8 +129,14 @@ test.describe('POST /Account/v1/GenerateToken', () => {
         'application/json',
       );
 
-      const responseBody =
-        (await response.json()) as FailedGenerateTokenResponse;
+      const responseBody: unknown =
+        await response.json();
+
+      assertMatchesSchema<FailedGenerateTokenResponse>(
+        failedGenerateTokenResponseSchema,
+        responseBody,
+        'POST /Account/v1/GenerateToken incorrect password response',
+      );
 
       expect(responseBody).toEqual(
         failedAuthorizationResponse,
@@ -141,7 +159,7 @@ test.describe('POST /Account/v1/GenerateToken', () => {
     }
   });
 
-      test('API-AUTH-003 - should fail token generation for a nonexistent user', async ({
+  test('API-AUTH-003 - should fail token generation for a nonexistent user', async ({
     request,
   }) => {
     const nonexistentUsername = generateUniqueUsername();
@@ -162,8 +180,14 @@ test.describe('POST /Account/v1/GenerateToken', () => {
       'application/json',
     );
 
-    const responseBody =
-      (await response.json()) as FailedGenerateTokenResponse;
+    const responseBody: unknown =
+      await response.json();
+
+    assertMatchesSchema<FailedGenerateTokenResponse>(
+      failedGenerateTokenResponseSchema,
+      responseBody,
+      'POST /Account/v1/GenerateToken nonexistent user response',
+    );
 
     expect(responseBody).toEqual(
       failedAuthorizationResponse,
@@ -172,12 +196,13 @@ test.describe('POST /Account/v1/GenerateToken', () => {
     expect(responseBody.token).toBeNull();
     expect(responseBody.expires).toBeNull();
     expect(responseBody.status).toBe('Failed');
+
     expect(responseBody.result).toBe(
       'User authorization failed.',
     );
   });
 
-      test('API-AUTH-004 - should return an error when generating a token with an empty username', async ({
+  test('API-AUTH-004 - should return an error when generating a token with an empty username', async ({
     request,
   }) => {
     const response = await request.post(
@@ -196,15 +221,21 @@ test.describe('POST /Account/v1/GenerateToken', () => {
       'application/json',
     );
 
-    const responseBody =
-      (await response.json()) as ApiErrorResponse;
+    const responseBody: unknown =
+      await response.json();
+
+    assertMatchesSchema<ApiErrorResponse>(
+      apiErrorSchema,
+      responseBody,
+      'POST /Account/v1/GenerateToken empty username error',
+    );
 
     expect(responseBody).toEqual(
       usernameAndPasswordRequiredError,
     );
   });
 
-      test('API-AUTH-005 - should return an error when generating a token with an empty password', async ({
+  test('API-AUTH-005 - should return an error when generating a token with an empty password', async ({
     request,
   }) => {
     const username = generateUniqueUsername();
@@ -225,8 +256,14 @@ test.describe('POST /Account/v1/GenerateToken', () => {
       'application/json',
     );
 
-    const responseBody =
-      (await response.json()) as ApiErrorResponse;
+    const responseBody: unknown =
+      await response.json();
+
+    assertMatchesSchema<ApiErrorResponse>(
+      apiErrorSchema,
+      responseBody,
+      'POST /Account/v1/GenerateToken empty password error',
+    );
 
     expect(responseBody).toEqual(
       usernameAndPasswordRequiredError,

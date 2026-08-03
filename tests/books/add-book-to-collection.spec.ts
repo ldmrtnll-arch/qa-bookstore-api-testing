@@ -1,277 +1,49 @@
-import { expect, test } from '@playwright/test';
-import {
-  cleanupTestUser,
-  createAuthenticatedTestUser,
-} from '../../utils/account-api';
-import {
-  addBookToUserCollection,
-  getBookCatalog,
-  getUserDetails,
-} from '../../utils/bookstore-api';
+import { expect, test } from "@playwright/test";
+import { addBooksResponseSchema } from "../../schemas/add-books-response.schema";
 import {
   bookNotAvailableError,
   duplicatedBookError,
   nonexistentBookIsbn,
   userNotAuthorizedError,
-} from '../../test-data/book-collection-data';
-import type { ApiErrorResponse } from '../../types/api-error';
+} from "../../test-data/book-collection-data";
+import type { ApiErrorResponse } from "../../types/api-error";
+import type { AddBooksResponse } from "../../types/book-collection";
+import {
+  cleanupTestUser,
+  createAuthenticatedTestUser,
+} from "../../utils/account-api";
+import {
+  addBookToUserCollection,
+  getBookCatalog,
+  getUserDetails,
+} from "../../utils/bookstore-api";
+import { assertMatchesSchema } from "../../utils/schema-validator";
+import { apiErrorSchema } from "../../schemas/api-error.schema";
 
-test.describe('POST /BookStore/v1/Books', () => {
-  test('API-COL-001 - should add an available book to an authenticated user collection', async ({
+test.describe("POST /BookStore/v1/Books", () => {
+  test("API-COL-001 - should add an available book to an authenticated user collection", async ({
     request,
   }) => {
-    const testUser =
-      await createAuthenticatedTestUser(request);
+    const testUser = await createAuthenticatedTestUser(request);
 
     try {
-      const {
-        response: catalogResponse,
-        body: catalog,
-      } = await getBookCatalog(request);
+      const { response: catalogResponse, body: catalog } =
+        await getBookCatalog(request);
 
       expect(catalogResponse.status()).toBe(200);
 
-      expect(
-        catalogResponse.headers()['content-type'],
-      ).toContain('application/json');
+      expect(catalogResponse.headers()["content-type"]).toContain(
+        "application/json",
+      );
 
       expect(
         catalog.books.length,
-        'The catalog should contain at least one available book',
+        "The catalog should contain at least one available book",
       ).toBeGreaterThan(0);
 
       const selectedBook = catalog.books[0];
 
-      const {
-        response: addBookResponse,
-        body: addBookResponseBody,
-      } = await addBookToUserCollection(
-        request,
-        testUser.userID,
-        testUser.token,
-        selectedBook.isbn,
-      );
-
-      expect(addBookResponse.status()).toBe(201);
-
-      expect(
-        addBookResponse.headers()['content-type'],
-      ).toContain('application/json');
-
-      expect(addBookResponseBody.books).toEqual([
-        {
-          isbn: selectedBook.isbn,
-        },
-      ]);
-
-      const {
-        response: getUserResponse,
-        body: userResponseBody,
-      } = await getUserDetails(
-        request,
-        testUser.userID,
-        testUser.token,
-      );
-
-      expect(getUserResponse.status()).toBe(200);
-
-      expect(
-        getUserResponse.headers()['content-type'],
-      ).toContain('application/json');
-
-      expect(userResponseBody.userId).toBe(
-        testUser.userID,
-      );
-
-      expect(userResponseBody.username).toBe(
-        testUser.credentials.userName,
-      );
-
-      expect(userResponseBody.books).toHaveLength(1);
-
-      expect(userResponseBody.books[0]).toEqual(
-        selectedBook,
-      );
-
-      expect(userResponseBody.books[0].isbn).toBe(
-        selectedBook.isbn,
-      );
-    } finally {
-      await cleanupTestUser(
-        request,
-        testUser.userID,
-        testUser.token,
-      );
-    }
-  });
-
-      test('API-COL-002 - should reject adding a book without an authentication token', async ({
-    request,
-  }) => {
-    const testUser =
-      await createAuthenticatedTestUser(request);
-
-    try {
-      const { body: catalog } =
-        await getBookCatalog(request);
-
-      expect(
-        catalog.books.length,
-        'The catalog should contain at least one available book',
-      ).toBeGreaterThan(0);
-
-      const selectedBook = catalog.books[0];
-
-      const response = await request.post(
-        '/BookStore/v1/Books',
-        {
-          data: {
-            userId: testUser.userID,
-            collectionOfIsbns: [
-              {
-                isbn: selectedBook.isbn,
-              },
-            ],
-          },
-        },
-      );
-
-      expect(response.status()).toBe(401);
-
-      expect(
-        response.headers()['content-type'],
-      ).toContain('application/json');
-
-      const responseBody =
-        (await response.json()) as ApiErrorResponse;
-
-      expect(responseBody).toEqual(
-        userNotAuthorizedError,
-      );
-
-      expect(responseBody.code).toBe('1200');
-      expect(responseBody.message).toBe(
-        'User not authorized!',
-      );
-
-      const {
-        response: getUserResponse,
-        body: userResponseBody,
-      } = await getUserDetails(
-        request,
-        testUser.userID,
-        testUser.token,
-      );
-
-      expect(getUserResponse.status()).toBe(200);
-
-      expect(
-        userResponseBody.books,
-        'The failed request should not persist a book in the user collection',
-      ).toHaveLength(0);
-    } finally {
-      await cleanupTestUser(
-        request,
-        testUser.userID,
-        testUser.token,
-      );
-    }
-  });
-
-      test('API-COL-003 - should reject adding a book with an invalid token', async ({
-    request,
-  }) => {
-    const testUser =
-      await createAuthenticatedTestUser(request);
-
-    try {
-      const { body: catalog } =
-        await getBookCatalog(request);
-
-      expect(
-        catalog.books.length,
-        'The catalog should contain at least one available book',
-      ).toBeGreaterThan(0);
-
-      const selectedBook = catalog.books[0];
-
-      const response = await request.post(
-        '/BookStore/v1/Books',
-        {
-          headers: {
-            Authorization: 'Bearer invalid-token',
-          },
-          data: {
-            userId: testUser.userID,
-            collectionOfIsbns: [
-              {
-                isbn: selectedBook.isbn,
-              },
-            ],
-          },
-        },
-      );
-
-      expect(response.status()).toBe(401);
-
-      expect(
-        response.headers()['content-type'],
-      ).toContain('application/json');
-
-      const responseBody =
-        (await response.json()) as ApiErrorResponse;
-
-      expect(responseBody).toEqual(
-        userNotAuthorizedError,
-      );
-
-      expect(responseBody.code).toBe('1200');
-      expect(responseBody.message).toBe(
-        'User not authorized!',
-      );
-
-      const {
-        response: getUserResponse,
-        body: userResponseBody,
-      } = await getUserDetails(
-        request,
-        testUser.userID,
-        testUser.token,
-      );
-
-      expect(getUserResponse.status()).toBe(200);
-
-      expect(
-        userResponseBody.books,
-        'The request with an invalid token should not persist a book',
-      ).toHaveLength(0);
-    } finally {
-      await cleanupTestUser(
-        request,
-        testUser.userID,
-        testUser.token,
-      );
-    }
-  });
-
-      test('API-COL-004 - should reject adding a duplicated book to the user collection', async ({
-    request,
-  }) => {
-    const testUser =
-      await createAuthenticatedTestUser(request);
-
-    try {
-      const { body: catalog } =
-        await getBookCatalog(request);
-
-      expect(
-        catalog.books.length,
-        'The catalog should contain at least one available book',
-      ).toBeGreaterThan(0);
-
-      const selectedBook = catalog.books[0];
-
-      const firstAddition =
+      const { response: addBookResponse, body: addBookResponseBody } =
         await addBookToUserCollection(
           request,
           testUser.userID,
@@ -279,18 +51,332 @@ test.describe('POST /BookStore/v1/Books', () => {
           selectedBook.isbn,
         );
 
+      expect(addBookResponse.status()).toBe(201);
+
+      expect(addBookResponse.headers()["content-type"]).toContain(
+        "application/json",
+      );
+
+      assertMatchesSchema<AddBooksResponse>(
+        addBooksResponseSchema,
+        addBookResponseBody,
+        "POST /BookStore/v1/Books success response",
+      );
+
+      expect(addBookResponseBody.books).toEqual([
+        {
+          isbn: selectedBook.isbn,
+        },
+      ]);
+
+      const { response: getUserResponse, body: userResponseBody } =
+        await getUserDetails(request, testUser.userID, testUser.token);
+
+      expect(getUserResponse.status()).toBe(200);
+
+      expect(getUserResponse.headers()["content-type"]).toContain(
+        "application/json",
+      );
+
+      expect(userResponseBody.userId).toBe(testUser.userID);
+
+      expect(userResponseBody.username).toBe(testUser.credentials.userName);
+
+      expect(userResponseBody.books).toHaveLength(1);
+
+      expect(userResponseBody.books[0]).toEqual(selectedBook);
+
+      expect(userResponseBody.books[0].isbn).toBe(selectedBook.isbn);
+    } finally {
+      await cleanupTestUser(request, testUser.userID, testUser.token);
+    }
+  });
+
+  test("API-COL-002 - should reject adding a book without an authentication token", async ({
+    request,
+  }) => {
+    const testUser = await createAuthenticatedTestUser(request);
+
+    try {
+      const { body: catalog } = await getBookCatalog(request);
+
+      expect(
+        catalog.books.length,
+        "The catalog should contain at least one available book",
+      ).toBeGreaterThan(0);
+
+      const selectedBook = catalog.books[0];
+
+      const response = await request.post("/BookStore/v1/Books", {
+        data: {
+          userId: testUser.userID,
+          collectionOfIsbns: [
+            {
+              isbn: selectedBook.isbn,
+            },
+          ],
+        },
+      });
+
+      expect(response.status()).toBe(401);
+
+      expect(response.headers()["content-type"]).toContain("application/json");
+
+      const responseBody: unknown = await response.json();
+
+      assertMatchesSchema<ApiErrorResponse>(
+        apiErrorSchema,
+        responseBody,
+        "POST /BookStore/v1/Books missing token error",
+      );
+
+      expect(responseBody).toEqual(userNotAuthorizedError);
+
+      expect(responseBody.code).toBe("1200");
+      expect(responseBody.message).toBe("User not authorized!");
+
+      const { response: getUserResponse, body: userResponseBody } =
+        await getUserDetails(request, testUser.userID, testUser.token);
+
+      expect(getUserResponse.status()).toBe(200);
+
+      expect(
+        userResponseBody.books,
+        "The failed request should not persist a book in the user collection",
+      ).toHaveLength(0);
+    } finally {
+      await cleanupTestUser(request, testUser.userID, testUser.token);
+    }
+  });
+
+  test("API-COL-003 - should reject adding a book with an invalid token", async ({
+    request,
+  }) => {
+    const testUser = await createAuthenticatedTestUser(request);
+
+    try {
+      const { body: catalog } = await getBookCatalog(request);
+
+      expect(
+        catalog.books.length,
+        "The catalog should contain at least one available book",
+      ).toBeGreaterThan(0);
+
+      const selectedBook = catalog.books[0];
+
+      const response = await request.post("/BookStore/v1/Books", {
+        headers: {
+          Authorization: "Bearer invalid-token",
+        },
+        data: {
+          userId: testUser.userID,
+          collectionOfIsbns: [
+            {
+              isbn: selectedBook.isbn,
+            },
+          ],
+        },
+      });
+
+      expect(response.status()).toBe(401);
+
+      expect(response.headers()["content-type"]).toContain("application/json");
+
+      const responseBody: unknown = await response.json();
+
+      assertMatchesSchema<ApiErrorResponse>(
+        apiErrorSchema,
+        responseBody,
+        "POST /BookStore/v1/Books invalid token error",
+      );
+
+      expect(responseBody).toEqual(userNotAuthorizedError);
+
+      expect(responseBody.code).toBe("1200");
+      expect(responseBody.message).toBe("User not authorized!");
+
+      const { response: getUserResponse, body: userResponseBody } =
+        await getUserDetails(request, testUser.userID, testUser.token);
+
+      expect(getUserResponse.status()).toBe(200);
+
+      expect(
+        userResponseBody.books,
+        "The request with an invalid token should not persist a book",
+      ).toHaveLength(0);
+    } finally {
+      await cleanupTestUser(request, testUser.userID, testUser.token);
+    }
+  });
+
+  test("API-COL-004 - should reject adding a duplicated book to the user collection", async ({
+    request,
+  }) => {
+    const testUser = await createAuthenticatedTestUser(request);
+
+    try {
+      const { body: catalog } = await getBookCatalog(request);
+
+      expect(
+        catalog.books.length,
+        "The catalog should contain at least one available book",
+      ).toBeGreaterThan(0);
+
+      const selectedBook = catalog.books[0];
+
+      const firstAddition = await addBookToUserCollection(
+        request,
+        testUser.userID,
+        testUser.token,
+        selectedBook.isbn,
+      );
+
       expect(
         firstAddition.response.status(),
-        'The first book addition should succeed',
+        "The first book addition should succeed",
       ).toBe(201);
 
-      const duplicatedAdditionResponse =
-        await request.post('/BookStore/v1/Books', {
+      const duplicatedAdditionResponse = await request.post(
+        "/BookStore/v1/Books",
+        {
           headers: {
             Authorization: `Bearer ${testUser.token}`,
           },
           data: {
             userId: testUser.userID,
+            collectionOfIsbns: [
+              {
+                isbn: selectedBook.isbn,
+              },
+            ],
+          },
+        },
+      );
+
+      expect(duplicatedAdditionResponse.status()).toBe(400);
+
+      expect(duplicatedAdditionResponse.headers()["content-type"]).toContain(
+        "application/json",
+      );
+
+      const responseBody: unknown = await duplicatedAdditionResponse.json();
+
+      assertMatchesSchema<ApiErrorResponse>(
+        apiErrorSchema,
+        responseBody,
+        "POST /BookStore/v1/Books duplicated book error",
+      );
+
+      expect(responseBody).toEqual(duplicatedBookError);
+
+      expect(responseBody.code).toBe("1210");
+      expect(responseBody.message).toBe(
+        "ISBN already present in the User's Collection!",
+      );
+
+      const { response: getUserResponse, body: userResponseBody } =
+        await getUserDetails(request, testUser.userID, testUser.token);
+
+      expect(getUserResponse.status()).toBe(200);
+
+      expect(
+        userResponseBody.books,
+        "The collection should contain only the first successful addition",
+      ).toHaveLength(1);
+
+      expect(userResponseBody.books[0].isbn).toBe(selectedBook.isbn);
+
+      const duplicatedIsbnOccurrences = userResponseBody.books.filter(
+        (book) => book.isbn === selectedBook.isbn,
+      ).length;
+
+      expect(
+        duplicatedIsbnOccurrences,
+        "The same ISBN should appear only once in the collection",
+      ).toBe(1);
+    } finally {
+      await cleanupTestUser(request, testUser.userID, testUser.token);
+    }
+  });
+
+  test("API-COL-005 - should reject adding an ISBN that is not available in the catalog", async ({
+    request,
+  }) => {
+    const testUser = await createAuthenticatedTestUser(request);
+
+    try {
+      const response = await request.post("/BookStore/v1/Books", {
+        headers: {
+          Authorization: `Bearer ${testUser.token}`,
+        },
+        data: {
+          userId: testUser.userID,
+          collectionOfIsbns: [
+            {
+              isbn: nonexistentBookIsbn,
+            },
+          ],
+        },
+      });
+
+      expect(response.status()).toBe(400);
+
+      expect(response.headers()["content-type"]).toContain("application/json");
+
+      const responseBody: unknown = await response.json();
+
+      assertMatchesSchema<ApiErrorResponse>(
+        apiErrorSchema,
+        responseBody,
+        "POST /BookStore/v1/Books unavailable ISBN error",
+      );
+
+      expect(responseBody).toEqual(bookNotAvailableError);
+
+      expect(responseBody.code).toBe("1205");
+
+      expect(responseBody.message).toBe(
+        "ISBN supplied is not available in Books Collection!",
+      );
+
+      const { response: getUserResponse, body: userResponseBody } =
+        await getUserDetails(request, testUser.userID, testUser.token);
+
+      expect(getUserResponse.status()).toBe(200);
+
+      expect(
+        userResponseBody.books,
+        "An unavailable ISBN should not be persisted in the user collection",
+      ).toHaveLength(0);
+    } finally {
+      await cleanupTestUser(request, testUser.userID, testUser.token);
+    }
+  });
+
+  test("API-COL-010 - should prevent one user from adding a book to another user collection", async ({
+    request,
+  }) => {
+    const actingUser = await createAuthenticatedTestUser(request);
+
+    try {
+      const targetUser = await createAuthenticatedTestUser(request);
+
+      try {
+        const { body: catalog } = await getBookCatalog(request);
+
+        expect(
+          catalog.books.length,
+          "The catalog should contain at least one available book",
+        ).toBeGreaterThan(0);
+
+        const selectedBook = catalog.books[0];
+
+        const response = await request.post("/BookStore/v1/Books", {
+          headers: {
+            Authorization: `Bearer ${actingUser.token}`,
+          },
+          data: {
+            userId: targetUser.userID,
             collectionOfIsbns: [
               {
                 isbn: selectedBook.isbn,
@@ -299,228 +385,48 @@ test.describe('POST /BookStore/v1/Books', () => {
           },
         });
 
-      expect(
-        duplicatedAdditionResponse.status(),
-      ).toBe(400);
-
-      expect(
-        duplicatedAdditionResponse.headers()[
-          'content-type'
-        ],
-      ).toContain('application/json');
-
-      const responseBody =
-        (await duplicatedAdditionResponse.json()) as ApiErrorResponse;
-
-      expect(responseBody).toEqual(
-        duplicatedBookError,
-      );
-
-      expect(responseBody.code).toBe('1210');
-      expect(responseBody.message).toBe(
-        "ISBN already present in the User's Collection!",
-      );
-
-      const {
-        response: getUserResponse,
-        body: userResponseBody,
-      } = await getUserDetails(
-        request,
-        testUser.userID,
-        testUser.token,
-      );
-
-      expect(getUserResponse.status()).toBe(200);
-
-      expect(
-        userResponseBody.books,
-        'The collection should contain only the first successful addition',
-      ).toHaveLength(1);
-
-      expect(userResponseBody.books[0].isbn).toBe(
-        selectedBook.isbn,
-      );
-
-      const duplicatedIsbnOccurrences =
-        userResponseBody.books.filter(
-          (book) => book.isbn === selectedBook.isbn,
-        ).length;
-
-      expect(
-        duplicatedIsbnOccurrences,
-        'The same ISBN should appear only once in the collection',
-      ).toBe(1);
-    } finally {
-      await cleanupTestUser(
-        request,
-        testUser.userID,
-        testUser.token,
-      );
-    }
-  });
-
-      test('API-COL-005 - should reject adding an ISBN that is not available in the catalog', async ({
-    request,
-  }) => {
-    const testUser =
-      await createAuthenticatedTestUser(request);
-
-    try {
-      const response = await request.post(
-        '/BookStore/v1/Books',
-        {
-          headers: {
-            Authorization: `Bearer ${testUser.token}`,
-          },
-          data: {
-            userId: testUser.userID,
-            collectionOfIsbns: [
-              {
-                isbn: nonexistentBookIsbn,
-              },
-            ],
-          },
-        },
-      );
-
-      expect(response.status()).toBe(400);
-
-      expect(
-        response.headers()['content-type'],
-      ).toContain('application/json');
-
-      const responseBody =
-        (await response.json()) as ApiErrorResponse;
-
-      expect(responseBody).toEqual(
-        bookNotAvailableError,
-      );
-
-      expect(responseBody.code).toBe('1205');
-
-      expect(responseBody.message).toBe(
-        'ISBN supplied is not available in Books Collection!',
-      );
-
-      const {
-        response: getUserResponse,
-        body: userResponseBody,
-      } = await getUserDetails(
-        request,
-        testUser.userID,
-        testUser.token,
-      );
-
-      expect(getUserResponse.status()).toBe(200);
-
-      expect(
-        userResponseBody.books,
-        'An unavailable ISBN should not be persisted in the user collection',
-      ).toHaveLength(0);
-    } finally {
-      await cleanupTestUser(
-        request,
-        testUser.userID,
-        testUser.token,
-      );
-    }
-  });
-
-      test('API-COL-010 - should prevent one user from adding a book to another user collection', async ({
-    request,
-  }) => {
-    const actingUser =
-      await createAuthenticatedTestUser(request);
-
-    try {
-      const targetUser =
-        await createAuthenticatedTestUser(request);
-
-      try {
-        const { body: catalog } =
-          await getBookCatalog(request);
-
-        expect(
-          catalog.books.length,
-          'The catalog should contain at least one available book',
-        ).toBeGreaterThan(0);
-
-        const selectedBook = catalog.books[0];
-
-        const response = await request.post(
-          '/BookStore/v1/Books',
-          {
-            headers: {
-              Authorization: `Bearer ${actingUser.token}`,
-            },
-            data: {
-              userId: targetUser.userID,
-              collectionOfIsbns: [
-                {
-                  isbn: selectedBook.isbn,
-                },
-              ],
-            },
-          },
-        );
-
         expect(response.status()).toBe(401);
 
-        expect(
-          response.headers()['content-type'],
-        ).toContain('application/json');
-
-        const responseBody =
-          (await response.json()) as ApiErrorResponse;
-
-        expect(responseBody).toEqual(
-          userNotAuthorizedError,
+        expect(response.headers()["content-type"]).toContain(
+          "application/json",
         );
 
-        expect(responseBody.code).toBe('1200');
+        const responseBody: unknown = await response.json();
 
-        expect(responseBody.message).toBe(
-          'User not authorized!',
+        assertMatchesSchema<ApiErrorResponse>(
+          apiErrorSchema,
+          responseBody,
+          "POST /BookStore/v1/Books cross-user authorization error",
         );
 
-        const {
-          response: actingUserResponse,
-          body: actingUserDetails,
-        } = await getUserDetails(
-          request,
-          actingUser.userID,
-          actingUser.token,
-        );
+        expect(responseBody).toEqual(userNotAuthorizedError);
+
+        expect(responseBody.code).toBe("1200");
+
+        expect(responseBody.message).toBe("User not authorized!");
+
+        const { response: actingUserResponse, body: actingUserDetails } =
+          await getUserDetails(request, actingUser.userID, actingUser.token);
 
         expect(actingUserResponse.status()).toBe(200);
 
-        expect(actingUserDetails.userId).toBe(
-          actingUser.userID,
-        );
+        expect(actingUserDetails.userId).toBe(actingUser.userID);
 
         expect(
           actingUserDetails.books,
-          'The acting user collection should remain unchanged',
+          "The acting user collection should remain unchanged",
         ).toHaveLength(0);
 
-        const {
-          response: targetUserResponse,
-          body: targetUserDetails,
-        } = await getUserDetails(
-          request,
-          targetUser.userID,
-          targetUser.token,
-        );
+        const { response: targetUserResponse, body: targetUserDetails } =
+          await getUserDetails(request, targetUser.userID, targetUser.token);
 
         expect(targetUserResponse.status()).toBe(200);
 
-        expect(targetUserDetails.userId).toBe(
-          targetUser.userID,
-        );
+        expect(targetUserDetails.userId).toBe(targetUser.userID);
 
         expect(
           targetUserDetails.books,
-          'The target user collection should remain unchanged',
+          "The target user collection should remain unchanged",
         ).toHaveLength(0);
 
         expect(
@@ -529,18 +435,10 @@ test.describe('POST /BookStore/v1/Books', () => {
           ),
         ).toBe(false);
       } finally {
-        await cleanupTestUser(
-          request,
-          targetUser.userID,
-          targetUser.token,
-        );
+        await cleanupTestUser(request, targetUser.userID, targetUser.token);
       }
     } finally {
-      await cleanupTestUser(
-        request,
-        actingUser.userID,
-        actingUser.token,
-      );
+      await cleanupTestUser(request, actingUser.userID, actingUser.token);
     }
   });
 });
