@@ -1,0 +1,69 @@
+meta {
+  name: Get Books
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/BookStore/v1/Books
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+  res.headers['content-type']: contains application/json
+  res.body.books: isArray
+  res.body.books: isNotEmpty
+  res.body.books[0].isbn: isNotEmpty
+  res.body.books[0].title: isNotEmpty
+  res.body.books[0].pages: isNumber
+}
+
+tests {
+  test("all books should contain valid required fields", function () {
+    const responseBody = res.getBody();
+
+    expect(responseBody).to.have.property("books");
+    expect(responseBody.books).to.be.an("array").that.is.not.empty;
+
+    responseBody.books.forEach((book, index) => {
+      expect(
+        book,
+        `Book at index ${index} should be an object`,
+      ).to.be.an("object");
+
+      expect(book).to.have.all.keys(
+        "isbn",
+        "title",
+        "subTitle",
+        "author",
+        "publish_date",
+        "publisher",
+        "pages",
+        "description",
+        "website",
+      );
+
+      expect(book.isbn).to.be.a("string").and.not.be.empty;
+      expect(book.title).to.be.a("string").and.not.be.empty;
+      expect(book.subTitle).to.be.a("string");
+      expect(book.author).to.be.a("string").and.not.be.empty;
+      expect(book.publish_date).to.be.a("string").and.not.be.empty;
+      expect(book.publisher).to.be.a("string").and.not.be.empty;
+      expect(book.pages).to.be.a("number").and.be.greaterThan(0);
+      expect(book.description).to.be.a("string").and.not.be.empty;
+      expect(book.website).to.be.a("string").and.match(/^https?:\/\//);
+
+      expect(
+        Number.isNaN(Date.parse(book.publish_date)),
+        `Book at index ${index} should have a valid publish date`,
+      ).to.equal(false);
+    });
+  });
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
