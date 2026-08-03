@@ -1,0 +1,83 @@
+meta {
+  name: Create User
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/Account/v1/User
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "userName": "{{testUsername}}",
+    "password": "{{process.env.BOOKSTORE_TEST_PASSWORD}}"
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.headers['content-type']: contains application/json
+  res.body.userID: isNotEmpty
+  res.body.username: isNotEmpty
+  res.body.books: isArray
+  res.body.books: isEmpty
+}
+
+script:pre-request {
+  const randomSuffix = Math.random()
+    .toString(36)
+    .slice(2, 10);
+
+  const username =
+    `qa_portfolio_${Date.now()}_${randomSuffix}`;
+
+  bru.setVar("testUsername", username);
+}
+
+script:post-response {
+  const responseBody = res.getBody();
+
+  if (responseBody?.userID) {
+    bru.setVar("userId", responseBody.userID);
+  }
+}
+
+tests {
+  test("created user should match the generated credentials", function () {
+    const responseBody = res.getBody();
+    const expectedUsername = bru.getVar("testUsername");
+
+    expect(responseBody.username).to.equal(expectedUsername);
+  });
+
+  test("created user response should match the expected contract", function () {
+    const responseBody = res.getBody();
+
+    expect(responseBody).to.have.all.keys(
+      "userID",
+      "username",
+      "books",
+    );
+
+    expect(responseBody.userID).to.be.a("string").and.not.be.empty;
+
+    expect(responseBody.userID).to.match(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    );
+
+    expect(responseBody.username).to.be.a("string").and.not.be.empty;
+    expect(responseBody.books).to.be.an("array").that.is.empty;
+  });
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

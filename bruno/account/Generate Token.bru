@@ -1,0 +1,93 @@
+meta {
+  name: Generate Token
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/Account/v1/GenerateToken
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "userName": "{{testUsername}}",
+    "password": "{{process.env.BOOKSTORE_TEST_PASSWORD}}"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.headers['content-type']: contains application/json
+  res.body.token: isNotEmpty
+  res.body.expires: isNotEmpty
+  res.body.status: eq Success
+  res.body.result: eq User authorized successfully.
+}
+
+script:post-response {
+  const responseBody = res.getBody();
+
+  if (responseBody?.token) {
+    bru.setVar("authToken", responseBody.token);
+  }
+}
+
+tests {
+  test("generated token response should match the expected contract", function () {
+    const responseBody = res.getBody();
+
+    expect(responseBody).to.have.all.keys(
+      "token",
+      "expires",
+      "status",
+      "result",
+    );
+
+    expect(responseBody.token).to.be.a("string").and.not.be.empty;
+    expect(responseBody.expires).to.be.a("string").and.not.be.empty;
+    expect(responseBody.status).to.equal("Success");
+    expect(responseBody.result).to.equal(
+      "User authorized successfully.",
+    );
+  });
+
+  test("generated token should have a valid structure", function () {
+    const responseBody = res.getBody();
+    const tokenParts = responseBody.token.split(".");
+
+    expect(tokenParts).to.have.lengthOf(3);
+
+    tokenParts.forEach((tokenPart, index) => {
+      expect(
+        tokenPart,
+        `Token part at index ${index} should not be empty`,
+      ).to.be.a("string").and.not.be.empty;
+    });
+  });
+
+  test("token expiration should contain a valid future date", function () {
+    const responseBody = res.getBody();
+    const expirationTimestamp = Date.parse(responseBody.expires);
+
+    expect(
+      Number.isNaN(expirationTimestamp),
+      "Token expiration should contain a valid date",
+    ).to.equal(false);
+
+    expect(
+      expirationTimestamp,
+      "Token expiration should be in the future",
+    ).to.be.greaterThan(Date.now());
+  });
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
