@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
+import { getRequiredEnvironmentVariable } from '../utils/environment';
 
-export const validUserPassword = '***REMOVED***';
+export const validUserPassword =
+  getRequiredEnvironmentVariable('BOOKSTORE_TEST_PASSWORD');
 
 export const invalidUserPassword = 'weak';
 
