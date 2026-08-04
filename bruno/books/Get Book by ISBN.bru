@@ -1,0 +1,69 @@
+meta {
+  name: Get Book by ISBN
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/BookStore/v1/Book?ISBN={{validIsbn}}
+  body: none
+  auth: inherit
+}
+
+params:query {
+  ISBN: {{validIsbn}}
+}
+
+assert {
+  res.status: eq 200
+  res.headers['content-type']: contains application/json
+  res.body.isbn: isNotEmpty
+  res.body.title: isNotEmpty
+  res.body.author: isNotEmpty
+  res.body.pages: isNumber
+  res.body.website: isNotEmpty
+}
+
+tests {
+  test("returned book should match the requested ISBN", function () {
+    const responseBody = res.getBody();
+    const expectedIsbn = bru.getEnvVar("validIsbn");
+
+    expect(responseBody.isbn).to.equal(expectedIsbn);
+  });
+
+  test("returned book should contain valid required fields", function () {
+    const responseBody = res.getBody();
+
+    expect(responseBody).to.have.all.keys(
+      "isbn",
+      "title",
+      "subTitle",
+      "author",
+      "publish_date",
+      "publisher",
+      "pages",
+      "description",
+      "website",
+    );
+
+    expect(responseBody.isbn).to.be.a("string").and.not.be.empty;
+    expect(responseBody.title).to.be.a("string").and.not.be.empty;
+    expect(responseBody.subTitle).to.be.a("string");
+    expect(responseBody.author).to.be.a("string").and.not.be.empty;
+    expect(responseBody.publish_date).to.be.a("string").and.not.be.empty;
+    expect(responseBody.publisher).to.be.a("string").and.not.be.empty;
+    expect(responseBody.pages).to.be.a("number").and.be.greaterThan(0);
+    expect(responseBody.description).to.be.a("string").and.not.be.empty;
+    expect(responseBody.website).to.match(/^https?:\/\//);
+
+    expect(Number.isNaN(Date.parse(responseBody.publish_date))).to.equal(
+      false,
+    );
+  });
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

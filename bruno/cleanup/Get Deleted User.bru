@@ -1,0 +1,45 @@
+meta {
+  name: Get Deleted User
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/Account/v1/User/{{userId}}
+  body: none
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{authToken}}
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 401
+  res.headers['content-type']: contains application/json
+  res.body.code: isString
+  res.body.message: eq User not found!
+}
+
+tests {
+  test("deleted user should no longer be available", function () {
+    const responseBody = res.getBody();
+
+    expect(responseBody).to.have.all.keys(
+      "code",
+      "message",
+    );
+
+    expect(responseBody.code).to.be.a("string");
+    expect(responseBody.code).to.equal("1207");
+
+    expect(responseBody.message).to.be.a("string").and.not.be.empty;
+    expect(responseBody.message).to.equal("User not found!");
+  });
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
