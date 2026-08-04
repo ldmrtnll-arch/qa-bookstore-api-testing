@@ -10,8 +10,9 @@
 | Execution date | 2026-08-04 |
 | Execution environment | Local Windows environment using PowerShell |
 | Test tools | Playwright API, TypeScript and Bruno CLI |
-| Branch | `docs/api-test-documentation` |
-| Overall result | Passed with one known skipped scenario |
+| Branch used for the recorded local execution | `docs/api-test-documentation` |
+| CI validation branch | `main` |
+| Overall result | Local regression passed with one known skipped scenario; GitHub Actions passed |
 
 ---
 
@@ -48,7 +49,6 @@ The execution did not include:
 - performance testing;
 - database validation;
 - user interface testing;
-- GitHub Actions execution;
 - production monitoring.
 
 ---
@@ -240,16 +240,66 @@ The local test suites passed after these changes.
 
 ---
 
-## 9. Final Result
+## 9. GitHub Actions Execution Result
+
+A GitHub Actions execution was triggered after publishing the final README to `main`.
+
+### Confirmed CI Information
+
+| Field | Result |
+|---|---|
+| Workflow | `API Tests` |
+| Trigger | Push to `main` |
+| Commit | `f0215ca` — `docs: add project README` |
+| Branch | `main` |
+| Workflow result | Passed |
+| GitHub check result | 1 check passed |
+| Observed duration | 1 minute and 24 seconds |
+| Playwright artifact | `playwright-report-3` |
+| Artifact size | 217 KB |
+
+### CI Workflow Scope
+
+The configured workflow contains the following steps:
+
+1. Check out the repository.
+2. Configure Node.js 24.
+3. Install dependencies with `npm ci`.
+4. Run TypeScript validation.
+5. Run the Playwright API suite.
+6. Upload Playwright reports and test results.
+
+### CI Result Interpretation
+
+The workflow completed successfully and produced the expected Playwright report artifact.
+
+The GitHub interface confirmed:
+
+```text
+API Tests: passed
+1 check passed
+Artifact: playwright-report-3
+Artifact size: 217 KB
+```
+
+The workflow result confirms that the project can be cloned, configured with the repository secret and executed in GitHub Actions.
+
+The GitHub Actions page was not used to extract a second per-test numerical summary. Therefore, the detailed counts of `31 passed` and `1 skipped` in this report remain the results of the recorded local regression execution.
+
+---
+
+## 10. Final Result
 
 | Validation | Result |
 |---|---|
 | TypeScript | Passed |
 | Playwright | Passed with one known skipped scenario |
 | Bruno | Passed |
-| Failed automated tests | 0 |
-| Known skipped scenarios | 1 |
-| Overall regression result | Passed |
+| GitHub Actions | Passed |
+| CI report artifact | Generated successfully |
+| Failed automated tests in the recorded local regression | 0 |
+| Known skipped scenarios in the recorded local regression | 1 |
+| Overall project validation | Passed |
 
 The project remained functional after the environment-variable and Git-history security changes.
 
@@ -264,7 +314,7 @@ The recorded execution confirms:
 
 ---
 
-## 10. Evidence and Report Availability
+## 11. Evidence and Report Availability
 
 Playwright generated its local HTML report through the configured reporter.
 
@@ -276,6 +326,18 @@ npx playwright show-report
 
 Generated report and execution-artifact folders are ignored by Git by default.
 
+The successful GitHub Actions execution uploaded:
+
+```text
+playwright-report-3
+```
+
+Recorded artifact size:
+
+```text
+217 KB
+```
+
 Evidence intended for the portfolio should not contain:
 
 - passwords;
@@ -286,11 +348,12 @@ Evidence intended for the portfolio should not contain:
 
 ---
 
-## 11. Limitations of This Report
+## 12. Limitations of This Report
 
 - The results represent one local execution performed on 2026-08-04.
 - The tested API is an external public dependency.
 - Future executions may differ because of availability, latency or API behavior changes.
 - The report does not claim that the skipped scenario passed.
 - The report does not include performance or database results.
-- GitHub Actions had not yet been configured for this recorded execution.
+- The detailed Playwright test counts were recorded from the local regression execution.
+- The CI result confirms overall workflow success and artifact generation, but this report does not invent per-test CI counts that were not inspected in the workflow logs.
