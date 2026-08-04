@@ -1,0 +1,82 @@
+meta {
+  name: Get User Collection
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/Account/v1/User/{{userId}}
+  body: none
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{authToken}}
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.headers['content-type']: contains application/json
+  res.body.userId: isNotEmpty
+  res.body.username: isNotEmpty
+  res.body.books: isArray
+  res.body.books: isNotEmpty
+  res.body.books[0].isbn: isNotEmpty
+}
+
+tests {
+  test("returned user should match the authenticated test user", function () {
+    const responseBody = res.getBody();
+    const expectedUserId = bru.getVar("userId");
+    const expectedUsername = bru.getVar("testUsername");
+
+    expect(responseBody.userId).to.equal(expectedUserId);
+    expect(responseBody.username).to.equal(expectedUsername);
+  });
+
+  test("user collection should contain the added book", function () {
+    const responseBody = res.getBody();
+    const expectedIsbn = bru.getEnvVar("validIsbn");
+
+    expect(responseBody.books).to.be.an("array");
+    expect(responseBody.books).to.have.lengthOf(1);
+    expect(responseBody.books[0].isbn).to.equal(expectedIsbn);
+  });
+
+  test("persisted book should match the expected contract", function () {
+    const responseBody = res.getBody();
+    const book = responseBody.books[0];
+
+    expect(book).to.have.all.keys(
+      "isbn",
+      "title",
+      "subTitle",
+      "author",
+      "publish_date",
+      "publisher",
+      "pages",
+      "description",
+      "website",
+    );
+
+    expect(book.isbn).to.be.a("string").and.not.be.empty;
+    expect(book.title).to.be.a("string").and.not.be.empty;
+    expect(book.subTitle).to.be.a("string");
+    expect(book.author).to.be.a("string").and.not.be.empty;
+    expect(book.publish_date).to.be.a("string").and.not.be.empty;
+    expect(book.publisher).to.be.a("string").and.not.be.empty;
+    expect(book.pages).to.be.a("number").and.be.greaterThan(0);
+    expect(book.description).to.be.a("string").and.not.be.empty;
+    expect(book.website).to.match(/^https?:\/\//);
+
+    expect(Number.isNaN(Date.parse(book.publish_date))).to.equal(
+      false,
+    );
+  });
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

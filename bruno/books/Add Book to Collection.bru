@@ -1,0 +1,67 @@
+meta {
+  name: Add Book to Collection
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/BookStore/v1/Books
+  body: json
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{authToken}}
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "userId": "{{userId}}",
+    "collectionOfIsbns": [
+      {
+        "isbn": "{{validIsbn}}"
+      }
+    ]
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.headers['content-type']: contains application/json
+  res.body.books: isArray
+  res.body.books: isNotEmpty
+  res.body.books[0].isbn: isNotEmpty
+}
+
+tests {
+  test("added book response should match the expected contract", function () {
+    const responseBody = res.getBody();
+
+    expect(responseBody).to.have.all.keys("books");
+    expect(responseBody.books).to.be.an("array").that.is.not.empty;
+
+    responseBody.books.forEach((book, index) => {
+      expect(
+        book,
+        `Book at index ${index} should contain only the ISBN`,
+      ).to.have.all.keys("isbn");
+
+      expect(book.isbn).to.be.a("string").and.not.be.empty;
+    });
+  });
+
+  test("added book should match the requested ISBN", function () {
+    const responseBody = res.getBody();
+    const expectedIsbn = bru.getEnvVar("validIsbn");
+
+    expect(responseBody.books).to.have.lengthOf(1);
+    expect(responseBody.books[0].isbn).to.equal(expectedIsbn);
+  });
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

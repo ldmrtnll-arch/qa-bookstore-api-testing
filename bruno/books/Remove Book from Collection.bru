@@ -1,0 +1,41 @@
+meta {
+  name: Remove Book from Collection
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{baseUrl}}/BookStore/v1/Book
+  body: json
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{authToken}}
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "isbn": "{{validIsbn}}",
+    "userId": "{{userId}}"
+  }
+}
+
+assert {
+  res.status: eq 204
+}
+
+tests {
+  test("successful book removal should return an empty body", function () {
+    const responseBody = res.getBody();
+
+    expect(responseBody).to.equal("");
+  });
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

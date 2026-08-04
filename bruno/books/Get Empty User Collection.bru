@@ -1,0 +1,58 @@
+meta {
+  name: Get Empty User Collection
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/Account/v1/User/{{userId}}
+  body: none
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{authToken}}
+  Accept: application/json
+}
+
+assert {
+  res.status: eq 200
+  res.headers['content-type']: contains application/json
+  res.body.userId: isNotEmpty
+  res.body.username: isNotEmpty
+  res.body.books: isArray
+  res.body.books: isEmpty
+}
+
+tests {
+  test("returned user should match the authenticated test user", function () {
+    const responseBody = res.getBody();
+    const expectedUserId = bru.getVar("userId");
+    const expectedUsername = bru.getVar("testUsername");
+
+    expect(responseBody.userId).to.equal(expectedUserId);
+    expect(responseBody.username).to.equal(expectedUsername);
+  });
+
+  test("user collection should be empty after removing the book", function () {
+    const responseBody = res.getBody();
+
+    expect(responseBody.books).to.be.an("array").that.is.empty;
+  });
+
+  test("removed ISBN should no longer exist in the user collection", function () {
+    const responseBody = res.getBody();
+    const removedIsbn = bru.getEnvVar("validIsbn");
+
+    const containsRemovedBook = responseBody.books.some(
+      (book) => book.isbn === removedIsbn,
+    );
+
+    expect(containsRemovedBook).to.equal(false);
+  });
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
